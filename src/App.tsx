@@ -7,6 +7,7 @@ import {
   Clock3,
   FileText,
   LayoutDashboard,
+  Mail,
   Menu,
   Newspaper,
   PencilLine,
@@ -18,6 +19,15 @@ import {
   TrendingUp,
   X,
 } from 'lucide-react';
+import {
+  FaDiscord,
+  FaFacebookF,
+  FaInstagram,
+  FaLinkedinIn,
+  FaPodcast,
+  FaXTwitter,
+  FaYoutube,
+} from 'react-icons/fa6';
 import {
   BrowserRouter,
   Link,
@@ -44,6 +54,7 @@ import { isSupabaseConfigured, supabase } from './lib/supabase';
 import {
   fetchArticles,
   fetchSubscriberCount,
+  fetchSubscribers,
   persistArticle,
   removeArticle,
   subscribeEmail,
@@ -65,32 +76,6 @@ function normalizeArticles(articles: Article[]): Article[] {
         }
       : article;
   });
-}
-
-function SocialBadge({ label }: { label: string }) {
-  const badgeMap: Record<string, string> = {
-    'X / Twitter': 'X',
-    Instagram: '◎',
-    LinkedIn: 'in',
-    YouTube: '▶',
-    Podcasts: '◉',
-    Community: '◎',
-  };
-
-  const toneMap: Record<string, string> = {
-    'X / Twitter': 'bg-slate-100 text-slate-900',
-    Instagram: 'bg-gradient-to-br from-fuchsia-500 via-pink-500 to-orange-400 text-white',
-    LinkedIn: 'bg-sky-600 text-white',
-    YouTube: 'bg-red-600 text-white',
-    Podcasts: 'bg-amber-500 text-slate-900',
-    Community: 'bg-violet-600 text-white',
-  };
-
-  return (
-    <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[9px] font-black ${toneMap[label] ?? 'bg-slate-100 text-slate-900'}`}>
-      {badgeMap[label] ?? label.charAt(0).toUpperCase()}
-    </span>
-  );
 }
 
 function App() {
@@ -322,6 +307,20 @@ function App() {
           }
         />
         <Route
+          path="/admin/subscribers"
+          element={
+            authLoading || (session && editorAccess === null) ? (
+              <AdminLoading />
+            ) : session && editorAccess ? (
+              <AdminSubscribers onLogout={signOut} />
+            ) : session ? (
+              <EditorAccessDenied onLogout={signOut} />
+            ) : (
+              <Navigate to="/admin/login" replace />
+            )
+          }
+        />
+        <Route
           path="/admin/article/:id"
           element={
             authLoading || (session && editorAccess === null) ? (
@@ -388,11 +387,6 @@ function PublicLayout({ children }: { children: React.ReactNode }) {
               <span className="font-medium">Breaking: pipeline upgrade on track</span>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Link to="/admin" className="rounded-full border border-slate-700 px-3 py-1.5 text-slate-50 transition hover:border-slate-500 hover:text-amber-300">
-              Admin
-            </Link>
-          </div>
         </div>
       </div>
 
@@ -419,15 +413,18 @@ function PublicLayout({ children }: { children: React.ReactNode }) {
               </label>
             </form>
 
-            <div className="hidden items-center gap-3 md:flex">
+            <div className="hidden items-center gap-4 md:flex">
               <Link to="/search" className="rounded-full border border-slate-200 p-2 text-slate-700 transition hover:border-slate-300 hover:text-slate-900">
                 <Search className="h-4 w-4" />
               </Link>
-              <a href="https://twitter.com" target="_blank" rel="noreferrer" className="text-sm text-slate-700 hover:text-slate-900">
-                X
+              <a href="https://x.com" target="_blank" rel="noreferrer" aria-label="Follow PrimeFrame on X" title="X" className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-950">
+                <FaXTwitter className="h-4 w-4" aria-hidden="true" />
               </a>
-              <a href="https://facebook.com" target="_blank" rel="noreferrer" className="text-sm text-slate-700 hover:text-slate-900">
-                Facebook
+              <a href="https://facebook.com" target="_blank" rel="noreferrer" aria-label="Follow PrimeFrame on Facebook" title="Facebook" className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-700 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700">
+                <FaFacebookF className="h-4 w-4" aria-hidden="true" />
+              </a>
+              <a href="https://instagram.com" target="_blank" rel="noreferrer" aria-label="Follow PrimeFrame on Instagram" title="Instagram" className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-700 transition hover:border-pink-200 hover:bg-pink-50 hover:text-pink-600">
+                <FaInstagram className="h-4 w-4" aria-hidden="true" />
               </a>
             </div>
 
@@ -487,8 +484,8 @@ function PublicLayout({ children }: { children: React.ReactNode }) {
       <main>{children}</main>
 
       <footer className="mt-12 border-t border-slate-200 bg-slate-950 text-slate-200">
-        <div className="mx-auto grid max-w-7xl gap-10 px-4 py-12 sm:px-6 lg:grid-cols-5 lg:px-8">
-          <div className="lg:col-span-2">
+        <div className="mx-auto grid max-w-7xl gap-10 px-4 py-12 sm:px-6 lg:grid-cols-4 lg:px-8">
+          <div>
             <div className="mb-4 flex items-center gap-3">
               <img src="/Prime%20Frames.jpeg" alt="PrimeFrame logo" className="h-10 w-10 rounded-lg object-cover" />
               <div>
@@ -499,6 +496,33 @@ function PublicLayout({ children }: { children: React.ReactNode }) {
             <p className="max-w-md text-sm text-slate-300">
               Independent journalism for a more informed public, with trusted reporting, analysis and community-first coverage.
             </p>
+            <div className="mt-8">
+              <h3 className="mb-4 text-sm font-semibold uppercase tracking-[0.2em] text-slate-400">Follow</h3>
+              <ul className="flex flex-wrap gap-2 text-sm">
+                {[
+                  { label: 'X', href: 'https://x.com', icon: FaXTwitter, color: 'text-white' },
+                  { label: 'Instagram', href: 'https://instagram.com', icon: FaInstagram, color: 'text-pink-400' },
+                  { label: 'Facebook', href: 'https://facebook.com', icon: FaFacebookF, color: 'text-blue-400' },
+                  { label: 'LinkedIn', href: 'https://linkedin.com', icon: FaLinkedinIn, color: 'text-sky-400' },
+                  { label: 'YouTube', href: 'https://youtube.com', icon: FaYoutube, color: 'text-red-400' },
+                  { label: 'Podcasts', href: 'https://podcasts.apple.com', icon: FaPodcast, color: 'text-violet-400' },
+                  { label: 'Community', href: 'https://discord.com', icon: FaDiscord, color: 'text-indigo-400' },
+                ].map(({ label, href, icon: Icon, color }) => (
+                  <li key={label}>
+                    <a
+                      href={href}
+                      target="_blank"
+                      rel="noreferrer"
+                      aria-label={`Follow PrimeFrame on ${label}`}
+                      title={label}
+                      className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-700 bg-slate-900 text-slate-300 transition hover:-translate-y-0.5 hover:border-slate-500 hover:bg-slate-800"
+                    >
+                      <Icon className={`h-[18px] w-[18px] ${color}`} aria-hidden="true" />
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
 
           <div>
@@ -529,31 +553,6 @@ function PublicLayout({ children }: { children: React.ReactNode }) {
             </ul>
           </div>
 
-          <div>
-            <h3 className="mb-4 text-sm font-semibold uppercase tracking-[0.2em] text-slate-400">Follow</h3>
-            <ul className="grid grid-cols-2 gap-2 text-sm text-slate-300">
-              {[
-                { label: 'X / Twitter', href: 'https://x.com' },
-                { label: 'Instagram', href: 'https://instagram.com' },
-                { label: 'LinkedIn', href: 'https://linkedin.com' },
-                { label: 'YouTube', href: 'https://youtube.com' },
-                { label: 'Podcasts', href: 'https://podcasts.apple.com' },
-                { label: 'Community', href: 'https://discord.com' },
-              ].map(({ label, href }) => (
-                <li key={label}>
-                  <a
-                    href={href}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900/70 px-3 py-2 text-slate-200 transition hover:border-slate-500 hover:bg-slate-800 hover:text-white"
-                  >
-                    <SocialBadge label={label} />
-                    <span>{label}</span>
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </div>
         </div>
       </footer>
     </div>
@@ -1175,6 +1174,116 @@ function AdminArticleRoute({
   );
 }
 
+function AdminSubscribers({ onLogout }: { onLogout: () => Promise<void> }) {
+  const [subscribers, setSubscribers] = useState<Awaited<ReturnType<typeof fetchSubscribers>>>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [search, setSearch] = useState('');
+
+  const handleLogout = async () => {
+    try {
+      await onLogout();
+    } catch (logoutError) {
+      setError(logoutError instanceof Error ? logoutError.message : 'Could not sign out.');
+    }
+  };
+
+  useEffect(() => {
+    let active = true;
+    const loadSubscribers = async () => {
+      if (!supabase) {
+        setError('Supabase is not configured.');
+        setLoading(false);
+        return;
+      }
+      try {
+        const result = await fetchSubscribers(supabase);
+        if (active) setSubscribers(result);
+      } catch (loadError) {
+        if (active) setError(loadError instanceof Error ? loadError.message : 'Could not load subscribers.');
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+    void loadSubscribers();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const filteredSubscribers = subscribers.filter((subscriber) =>
+    subscriber.email.toLowerCase().includes(search.trim().toLowerCase()),
+  );
+
+  return (
+    <div className="min-h-screen bg-slate-100">
+      <header className="border-b border-slate-200 bg-white">
+        <div className="mx-auto flex min-h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+          <div>
+            <p className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">Editorial workspace</p>
+            <h1 className="text-lg font-semibold text-slate-950 sm:text-xl">Newsletter subscribers</h1>
+          </div>
+          <div className="flex items-center gap-2">
+            <Link to="/admin" className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50">
+              Dashboard
+            </Link>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="rounded-xl bg-slate-950 px-3 py-2 text-sm font-medium text-white transition hover:bg-slate-800"
+            >
+              Sign out
+            </button>
+          </div>
+        </div>
+      </header>
+      <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+        <section className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200 sm:rounded-3xl sm:p-6">
+          <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Audience</p>
+              <h2 className="mt-1 text-2xl font-bold text-slate-950">Subscribers</h2>
+              <p className="mt-1 text-sm text-slate-500">
+                {loading ? 'Loading subscriber list…' : `${subscribers.length} subscriber${subscribers.length === 1 ? '' : 's'}`}
+              </p>
+            </div>
+            <label className="flex w-full items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-500 sm:w-72">
+              <Search className="h-4 w-4 shrink-0" aria-hidden="true" />
+              <input
+                type="search"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search email addresses"
+                className="min-w-0 flex-1 bg-transparent text-slate-900 outline-none placeholder:text-slate-400"
+              />
+            </label>
+          </div>
+          {error && <p role="alert" className="mb-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-800">{error}</p>}
+          {loading ? (
+            <div role="status" className="rounded-xl bg-slate-50 px-4 py-10 text-center text-sm text-slate-500">Loading subscribers…</div>
+          ) : !error && filteredSubscribers.length === 0 ? (
+            <div className="rounded-xl bg-slate-50 px-4 py-10 text-center">
+              <Mail className="mx-auto h-6 w-6 text-slate-400" aria-hidden="true" />
+              <p className="mt-3 text-sm font-medium text-slate-700">{search ? 'No matching subscribers' : 'No subscribers yet'}</p>
+            </div>
+          ) : !error ? (
+            <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200">
+              {filteredSubscribers.map((subscriber) => (
+                <li key={subscriber.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
+                  <span className="break-all text-sm font-medium text-slate-900">{subscriber.email}</span>
+                  <time dateTime={subscriber.created_at} className="text-xs text-slate-500">
+                    Joined {formatDateTime(subscriber.created_at)}
+                  </time>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </section>
+      </main>
+    </div>
+  );
+}
+
 function AdminDashboard({
   articles,
   subscriberCount,
@@ -1402,6 +1511,9 @@ function AdminDashboard({
           <a href="#overview" onClick={() => setSidebarOpen(false)} className="flex items-center gap-3 rounded-xl bg-white/10 px-4 py-3 text-sm font-medium text-white">
             <LayoutDashboard className="h-4 w-4" /> Overview
           </a>
+          <Link to="/admin/subscribers" onClick={() => setSidebarOpen(false)} className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-slate-300 transition hover:bg-white/10 hover:text-white">
+            <Send className="h-4 w-4" /> Subscribers
+          </Link>
           <a href="#content" onClick={() => setSidebarOpen(false)} className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-slate-300 transition hover:bg-white/10 hover:text-white">
             <Newspaper className="h-4 w-4" /> Content queue
           </a>
@@ -1446,13 +1558,23 @@ function AdminDashboard({
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {stats.map(({ label, value, icon: Icon }) => (
-            <div key={label} className="flex min-w-0 items-center gap-3 rounded-2xl bg-white p-3 shadow-sm ring-1 ring-slate-200 sm:p-4">
-              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-700"><Icon className="h-4 w-4" /></span>
-              <div className="min-w-0">
-                <p className="truncate text-xs font-medium text-slate-500 sm:text-sm">{label}</p>
-                <p className="mt-0.5 text-xl font-bold tracking-tight text-slate-950 sm:text-2xl">{value}</p>
+            label === 'Subscribers' ? (
+              <Link key={label} to="/admin/subscribers" aria-label={`View ${value} newsletter subscribers`} className="flex min-w-0 items-center gap-3 rounded-2xl bg-white p-3 text-left shadow-sm ring-1 ring-slate-200 transition hover:-translate-y-0.5 hover:shadow-md hover:ring-slate-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700 sm:p-4">
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-700"><Icon className="h-4 w-4" /></span>
+                <div className="min-w-0">
+                  <p className="truncate text-xs font-medium text-slate-500 sm:text-sm">{label}</p>
+                  <p className="mt-0.5 text-xl font-bold tracking-tight text-slate-950 sm:text-2xl">{value}</p>
+                </div>
+              </Link>
+            ) : (
+              <div key={label} className="flex min-w-0 items-center gap-3 rounded-2xl bg-white p-3 shadow-sm ring-1 ring-slate-200 sm:p-4">
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-700"><Icon className="h-4 w-4" /></span>
+                <div className="min-w-0">
+                  <p className="truncate text-xs font-medium text-slate-500 sm:text-sm">{label}</p>
+                  <p className="mt-0.5 text-xl font-bold tracking-tight text-slate-950 sm:text-2xl">{value}</p>
+                </div>
               </div>
-            </div>
+            )
           ))}
           </div>
         </section>

@@ -5,6 +5,12 @@ import {
   type ArticleRow,
 } from './supabase';
 
+export type NewsletterSubscriber = {
+  id: string;
+  email: string;
+  created_at: string;
+};
+
 export function articleFromRow(row: ArticleRow): Article {
   return {
     id: row.id,
@@ -134,4 +140,13 @@ export async function fetchSubscriberCount(client: PrimeFrameSupabaseClient): Pr
     .select('*', { count: 'exact', head: true });
   if (error) throw new Error(`Could not load subscriber count: ${error.message}`);
   return count ?? 0;
+}
+
+export async function fetchSubscribers(client: PrimeFrameSupabaseClient): Promise<NewsletterSubscriber[]> {
+  const { data, error } = await client
+    .from('newsletter_subscribers')
+    .select('id, email, created_at')
+    .order('created_at', { ascending: false });
+  if (error) throw new Error(`Could not load subscribers: ${error.message}`);
+  return data;
 }
