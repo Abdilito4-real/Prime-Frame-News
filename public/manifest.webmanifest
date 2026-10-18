@@ -1,0 +1,12 @@
+{
+  "name": "PrimeFrame",
+  "short_name": "PrimeFrame",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#0f172a",
+  "description": "PrimeFrame digital newsroom and publishing dashboard.",
+  "icons": [
+    { "src": "/Prime%20Frames.jpeg", "sizes": "1280x1280", "type": "image/jpeg", "purpose": "any maskable" }
+  ]
+}
