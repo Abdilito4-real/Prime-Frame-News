@@ -1,0 +1,44 @@
+name: Supabase activity check
+
+on:
+  schedule:
+    - cron: '17 9 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-activity-check
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Query Supabase without exposing credentials
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          node --input-type=module <<'NODE'
+          const { SUPABASE_URL, SUPABASE_ANON_KEY } = process.env;
+          if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+            throw new Error('Configure SUPABASE_URL and SUPABASE_ANON_KEY as repository Actions secrets.');
+          }
+
+          const endpoint = new URL('/rest/v1/articles?select=id&limit=1', SUPABASE_URL);
+          const response = await fetch(endpoint, {
+            headers: {
+              apikey: SUPABASE_ANON_KEY,
+              Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+            },
+            signal: AbortSignal.timeout(30_000),
+          });
+
+          if (!response.ok) {
+            throw new Error(`Supabase activity check failed with HTTP ${response.status}.`);
+          }
+          console.log('Supabase activity check succeeded.');
+          NODE

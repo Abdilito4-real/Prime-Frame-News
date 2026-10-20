@@ -30,6 +30,13 @@ create index if not exists articles_published_at_idx
 create index if not exists articles_category_slug_idx
   on public.articles (category_slug);
 
+update public.articles
+set category = 'Editorial',
+    category_slug = 'editorial',
+    updated_at = now()
+where lower(trim(category_slug)) = 'health'
+   or lower(trim(category)) = 'health';
+
 create table if not exists public.editor_users (
   user_id uuid primary key references auth.users (id) on delete cascade,
   created_at timestamptz not null default now()

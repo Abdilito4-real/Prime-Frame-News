@@ -1,6 +1,22 @@
 {
   "rewrites": [
     {
+      "source": "/",
+      "destination": "/api/site-home"
+    },
+    {
+      "source": "/article/:slug",
+      "destination": "/api/article-preview?slug=:slug"
+    },
+    {
+      "source": "/sitemap.xml",
+      "destination": "/api/sitemap"
+    },
+    {
+      "source": "/robots.txt",
+      "destination": "/api/robots"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

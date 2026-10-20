@@ -213,6 +213,8 @@ function App() {
 
   return (
     <BrowserRouter>
+      <PageMetadata articles={articles} />
+      <AnalyticsConsent />
       {dataError && (
         <div role="alert" className="border-b border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
           <div className="mx-auto max-w-7xl">{dataError}</div>
@@ -348,6 +350,215 @@ function App() {
   );
 }
 
+function PageMetadata({ articles }: { articles: Article[] }) {
+  const location = useLocation();
+
+  useEffect(() => {
+    const article = articles.find((entry) => `/article/${entry.slug}` === location.pathname && entry.status === 'published');
+    const title = article?.title ?? 'PrimeFrame';
+    const description = article?.excerpt || article?.subtitle || 'PrimeFrame News';
+    const siteOrigin = import.meta.env.VITE_SITE_URL || 'https://www.primeframe.ng';
+    const image = article?.image
+      ? new URL(article.image, siteOrigin).href
+      : new URL('/Prime%20Frames.jpeg', siteOrigin).href;
+    const canonicalUrl = new URL(location.pathname, siteOrigin).href;
+    const metadata: Array<{ attribute: 'name' | 'property'; key: string; value: string }> = [
+      { attribute: 'name', key: 'description', value: description },
+      { attribute: 'property', key: 'og:site_name', value: 'PrimeFrame' },
+      { attribute: 'property', key: 'og:type', value: article ? 'article' : 'website' },
+      { attribute: 'property', key: 'og:title', value: title },
+      { attribute: 'property', key: 'og:description', value: description },
+      { attribute: 'property', key: 'og:image', value: image },
+      { attribute: 'property', key: 'og:url', value: canonicalUrl },
+      { attribute: 'name', key: 'twitter:card', value: 'summary_large_image' },
+      { attribute: 'name', key: 'twitter:title', value: title },
+      { attribute: 'name', key: 'twitter:description', value: description },
+      { attribute: 'name', key: 'twitter:image', value: image },
+    ];
+
+    document.title = title;
+    for (const { attribute, key, value } of metadata) {
+      let element = document.head.querySelector<HTMLMetaElement>(`meta[${attribute}="${key}"]`);
+      if (!element) {
+        element = document.createElement('meta');
+        element.setAttribute(attribute, key);
+        document.head.append(element);
+      }
+      element.content = value;
+    }
+
+    let canonical = document.head.querySelector<HTMLLinkElement>('link[rel="canonical"]');
+    if (!canonical) {
+      canonical = document.createElement('link');
+      canonical.rel = 'canonical';
+      document.head.append(canonical);
+    }
+    canonical.href = canonicalUrl;
+  }, [articles, location.pathname]);
+
+  return null;
+}
+
+declare global {
+  interface Window {
+    dataLayer?: unknown[][];
+    gtag?: (...args: unknown[]) => void;
+  }
+}
+
+const analyticsConsentKey = 'primeframe-analytics-consent';
+const ga4MeasurementId = import.meta.env.VITE_GA4_MEASUREMENT_ID || 'G-W3SJ3XQZZ4';
+
+function AnalyticsConsent() {
+  const location = useLocation();
+  const isAdminRoute = location.pathname.startsWith('/admin');
+  const [consent, setConsent] = useState<'unknown' | 'granted' | 'denied'>('unknown');
+  const [storageError, setStorageError] = useState('');
+  const [analyticsError, setAnalyticsError] = useState('');
+
+  useEffect(() => {
+    try {
+      const savedConsent = window.localStorage.getItem(analyticsConsentKey);
+      if (savedConsent === 'granted' || savedConsent === 'denied') setConsent(savedConsent);
+    } catch (error) {
+      console.error('Could not read analytics consent preference:', error);
+      setStorageError('Your preference could not be read. Analytics will remain off until your choice can be saved.');
+    }
+
+    const openPreferences = () => {
+      window.gtag?.('consent', 'update', {
+        analytics_storage: 'denied',
+        ad_storage: 'denied',
+        ad_user_data: 'denied',
+        ad_personalization: 'denied',
+      });
+      try {
+        window.localStorage.removeItem(analyticsConsentKey);
+        setStorageError('');
+      } catch (error) {
+        console.error('Could not remove analytics consent preference:', error);
+        setStorageError('Your preference could not be reset in this browser.');
+      }
+      setConsent('unknown');
+    };
+
+    window.addEventListener('primeframe:manage-analytics', openPreferences);
+    return () => window.removeEventListener('primeframe:manage-analytics', openPreferences);
+  }, []);
+
+  useEffect(() => {
+    if (consent !== 'granted' || isAdminRoute) {
+      window.gtag?.('consent', 'update', {
+        analytics_storage: 'denied',
+        ad_storage: 'denied',
+        ad_user_data: 'denied',
+        ad_personalization: 'denied',
+      });
+      return;
+    }
+
+    if (!/^G-[A-Z0-9]+$/i.test(ga4MeasurementId)) {
+      console.error('Google Analytics was not loaded because the GA4 Measurement ID is invalid.');
+      return;
+    }
+
+    window.dataLayer = window.dataLayer || [];
+    window.gtag ??= (...args: unknown[]) => window.dataLayer?.push(args);
+    if (document.getElementById('primeframe-ga4')) {
+      window.gtag('consent', 'update', {
+        analytics_storage: 'granted',
+        ad_storage: 'denied',
+        ad_user_data: 'denied',
+        ad_personalization: 'denied',
+      });
+      return;
+    }
+
+    window.gtag('js', new Date());
+    window.gtag('consent', 'default', {
+      analytics_storage: 'denied',
+      ad_storage: 'denied',
+      ad_user_data: 'denied',
+      ad_personalization: 'denied',
+    });
+    window.gtag('consent', 'update', {
+      analytics_storage: 'granted',
+      ad_storage: 'denied',
+      ad_user_data: 'denied',
+      ad_personalization: 'denied',
+    });
+    window.gtag('config', ga4MeasurementId, { send_page_view: false });
+
+    const script = document.createElement('script');
+    script.id = 'primeframe-ga4';
+    script.async = true;
+    script.src = `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(ga4MeasurementId)}`;
+    script.onerror = () => {
+      script.remove();
+      setAnalyticsError('Google Analytics could not be loaded.');
+      console.error('Google Analytics script failed to load.');
+    };
+    document.head.append(script);
+  }, [consent, isAdminRoute]);
+
+  useEffect(() => {
+    if (consent !== 'granted' || isAdminRoute) return;
+    window.gtag?.('event', 'page_view', {
+      page_path: `${location.pathname}${location.search}`,
+      page_location: window.location.href,
+      page_title: document.title,
+    });
+  }, [consent, isAdminRoute, location.pathname, location.search]);
+
+  const saveConsent = (choice: 'granted' | 'denied') => {
+    try {
+      window.localStorage.setItem(analyticsConsentKey, choice);
+      setStorageError('');
+      if (choice === 'granted') setAnalyticsError('');
+      setConsent(choice);
+    } catch (error) {
+      console.error('Could not save analytics consent preference:', error);
+      setStorageError('Your choice could not be saved, so analytics will remain off.');
+      setConsent('unknown');
+    }
+  };
+
+  if (isAdminRoute) return null;
+  if (consent === 'granted') {
+    const visibleAnalyticsError = analyticsError || (!/^G-[A-Z0-9]+$/i.test(ga4MeasurementId)
+      ? 'Analytics is not configured with a valid GA4 Measurement ID.'
+      : '');
+    return visibleAnalyticsError ? (
+      <div role="alert" className="fixed inset-x-4 bottom-4 z-[90] mx-auto max-w-xl rounded-lg bg-red-800 px-4 py-3 text-sm text-white shadow-lg">
+        {visibleAnalyticsError}
+      </div>
+    ) : null;
+  }
+  if (consent !== 'unknown') return null;
+
+  return (
+    <section aria-label="Analytics privacy preferences" className="fixed inset-x-0 bottom-0 z-[90] border-t border-slate-200 bg-white/95 px-4 py-5 shadow-[0_-12px_40px_rgba(15,23,42,0.16)] backdrop-blur sm:px-6">
+      <div className="mx-auto flex max-w-7xl flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="max-w-3xl">
+          <h2 className="text-sm font-semibold text-slate-950">Your privacy choices</h2>
+          <p className="mt-1 text-sm leading-6 text-slate-600">
+            PrimeFrame uses Google Analytics to understand readership. Analytics stays off unless you accept. You can change this choice from the footer at any time. See our <Link to="/privacy" className="font-medium underline underline-offset-2 hover:text-slate-950">Privacy Policy</Link>.
+          </p>
+          {(storageError || analyticsError) && <p role="alert" className="mt-2 text-sm text-red-700">{storageError || analyticsError}</p>}
+        </div>
+        <div className="flex shrink-0 flex-wrap gap-2">
+          <button type="button" onClick={() => saveConsent('denied')} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+            Reject analytics
+          </button>
+          <button type="button" onClick={() => saveConsent('granted')} className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800">
+            Accept analytics
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function PublicLayout({ children }: { children: React.ReactNode }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -373,19 +584,21 @@ function PublicLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 antialiased">
-      <div className="border-b border-slate-200 bg-slate-950 text-slate-100">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 text-xs sm:px-6 lg:px-8">
-          <div className="flex items-center gap-3 text-slate-300">
-            <span className="rounded-full border border-slate-700 px-2 py-1 font-semibold uppercase tracking-[0.2em] text-amber-300">
+      <div className="relative overflow-hidden border-b border-amber-400/30 bg-gradient-to-r from-slate-950 via-slate-900 to-blue-950 text-slate-100">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,rgba(245,158,11,0.12),transparent_48%)]" />
+        <div className="relative mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-2.5 sm:px-6 lg:px-8">
+          <div className="flex items-center gap-3">
+            <span className="inline-flex items-center gap-2 rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-200">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-300" />
               Live
             </span>
-            <span>{new Intl.DateTimeFormat('en', { weekday: 'short', month: 'short', day: 'numeric' }).format(new Date())}</span>
+            <span className="text-xs font-medium tracking-wide text-slate-300">
+              {new Intl.DateTimeFormat('en', { weekday: 'short', month: 'short', day: 'numeric' }).format(new Date())}
+            </span>
           </div>
-          <div className="hidden items-center gap-4 md:flex">
-            <div className="flex items-center gap-2 text-slate-200">
-              <BellRing className="h-3.5 w-3.5 text-amber-300" />
-              <span className="font-medium">Breaking: pipeline upgrade on track</span>
-            </div>
+          <div className="hidden items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400 sm:flex">
+            <Newspaper className="h-3.5 w-3.5 text-amber-300" />
+            <span>PrimeFrame Newsroom</span>
           </div>
         </div>
       </div>
@@ -417,10 +630,10 @@ function PublicLayout({ children }: { children: React.ReactNode }) {
               <Link to="/search" className="rounded-full border border-slate-200 p-2 text-slate-700 transition hover:border-slate-300 hover:text-slate-900">
                 <Search className="h-4 w-4" />
               </Link>
-              <a href="https://x.com" target="_blank" rel="noreferrer" aria-label="Follow PrimeFrame on X" title="X" className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-950">
+              <a href="https://x.com/primeframeng?s=11" target="_blank" rel="noreferrer" aria-label="Follow PrimeFrame on X" title="X" className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-950">
                 <FaXTwitter className="h-4 w-4" aria-hidden="true" />
               </a>
-              <a href="https://facebook.com" target="_blank" rel="noreferrer" aria-label="Follow PrimeFrame on Facebook" title="Facebook" className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-700 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700">
+              <a href="https://www.facebook.com/share/1AtRwikWFM/?mibextid=wwXIfr" target="_blank" rel="noreferrer" aria-label="Follow PrimeFrame on Facebook" title="Facebook" className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-700 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700">
                 <FaFacebookF className="h-4 w-4" aria-hidden="true" />
               </a>
               <a href="https://instagram.com" target="_blank" rel="noreferrer" aria-label="Follow PrimeFrame on Instagram" title="Instagram" className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-700 transition hover:border-pink-200 hover:bg-pink-50 hover:text-pink-600">
@@ -500,9 +713,9 @@ function PublicLayout({ children }: { children: React.ReactNode }) {
               <h3 className="mb-4 text-sm font-semibold uppercase tracking-[0.2em] text-slate-400">Follow</h3>
               <ul className="flex flex-wrap gap-2 text-sm">
                 {[
-                  { label: 'X', href: 'https://x.com', icon: FaXTwitter, color: 'text-white' },
+                  { label: 'X', href: 'https://x.com/primeframeng?s=11', icon: FaXTwitter, color: 'text-white' },
                   { label: 'Instagram', href: 'https://instagram.com', icon: FaInstagram, color: 'text-pink-400' },
-                  { label: 'Facebook', href: 'https://facebook.com', icon: FaFacebookF, color: 'text-blue-400' },
+                  { label: 'Facebook', href: 'https://www.facebook.com/share/1AtRwikWFM/?mibextid=wwXIfr', icon: FaFacebookF, color: 'text-blue-400' },
                   { label: 'LinkedIn', href: 'https://linkedin.com', icon: FaLinkedinIn, color: 'text-sky-400' },
                   { label: 'YouTube', href: 'https://youtube.com', icon: FaYoutube, color: 'text-red-400' },
                   { label: 'Podcasts', href: 'https://podcasts.apple.com', icon: FaPodcast, color: 'text-violet-400' },
@@ -549,6 +762,7 @@ function PublicLayout({ children }: { children: React.ReactNode }) {
               <li><Link to="/about" className="hover:text-white">About Us</Link></li>
               <li><Link to="/contact" className="hover:text-white">Contact</Link></li>
               <li><Link to="/privacy" className="hover:text-white">Privacy Policy</Link></li>
+              <li><button type="button" onClick={() => window.dispatchEvent(new Event('primeframe:manage-analytics'))} className="text-left hover:text-white">Privacy settings</button></li>
               <li><Link to="/terms" className="hover:text-white">Terms of Use</Link></li>
             </ul>
           </div>
@@ -977,7 +1191,9 @@ function PrivacyPage() {
     <div className="space-y-4 text-slate-700">
       <p>We respect the privacy of readers and use data responsibly to improve the experience of our site and services.</p>
       <p>Subscriber data is kept confidential and only used for communication preferences selected by the reader.</p>
-      <p>We do not sell personal information, and we follow safeguard practices appropriate to a modern digital publication.</p>
+      <p>With your consent, Google Analytics helps us understand how readers use PrimeFrame. Analytics is not loaded unless you accept, and you can reject or withdraw consent at any time using the Privacy settings link in the footer. Advertising and ad-personalization storage remain disabled.</p>
+      <p>We do not sell personal information. For more information about data processed by Google Analytics, see <a href="https://policies.google.com/privacy" target="_blank" rel="noreferrer" className="underline underline-offset-2">Google’s privacy documentation</a>.</p>
+      <button type="button" onClick={() => window.dispatchEvent(new Event('primeframe:manage-analytics'))} className="font-medium text-slate-900 underline underline-offset-2 hover:text-red-700">Change analytics preferences</button>
     </div>
   );
 }

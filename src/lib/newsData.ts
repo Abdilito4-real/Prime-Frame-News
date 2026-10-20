@@ -58,16 +58,16 @@ export const categories: Category[] = [
     description: 'Schools, universities, examinations, admissions, scholarships, policy, and learning developments.',
   },
   {
-    id: 'health',
-    name: 'Health',
-    slug: 'health',
-    description: 'Public health, medical research, healthcare systems, wellness, and health policy.',
-  },
-  {
     id: 'opinion',
     name: 'Opinion',
     slug: 'opinion',
     description: 'Editorials, columns, commentary, perspectives, and signed opinion pieces.',
+  },
+  {
+    id: 'editorial',
+    name: 'Editorial',
+    slug: 'editorial',
+    description: 'Editorial coverage, newsroom analysis, and perspectives on the issues shaping the day.',
   },
 ];
 
@@ -162,8 +162,8 @@ export const seedArticles: Article[] = [
     title: 'Urban clinics expand community health screenings after record turnout',
     slug: 'urban-clinics-expand-community-health-screenings-after-record-turnout',
     subtitle: 'Public health teams are making screenings more accessible and preventive as demand for routine care remains high.',
-    category: 'Health',
-    categorySlug: 'health',
+    category: 'Editorial',
+    categorySlug: 'editorial',
     author: 'Binta Okafor',
     authorSlug: 'binta-okafor',
     excerpt: 'Medical outreach programs reported their strongest turnout in two years, prompting plans for expanded mobile clinics and digital follow-ups.',
