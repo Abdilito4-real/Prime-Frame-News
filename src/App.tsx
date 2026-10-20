@@ -1092,7 +1092,7 @@ function ArticlePage({ articles }: { articles: Article[] }) {
 
   if (!article) return <NotFound />;
 
-  const shareUrl = typeof window !== 'undefined' ? window.location.href : `https://example.com/article/${article.slug}`;
+  const shareUrl = getArticleShareUrl(article.slug);
 
   return (
     <article className="mx-auto max-w-5xl px-4 py-10 sm:px-6 lg:px-8">
@@ -1122,7 +1122,7 @@ function ArticlePage({ articles }: { articles: Article[] }) {
 
         <div className="mt-6 flex flex-wrap gap-3">
           <ShareArticle article={article} />
-          <a href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(article.title)}&url=${encodeURIComponent(shareUrl)}`} target="_blank" rel="noreferrer" className="rounded-full border border-slate-200 bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700 hover:border-slate-300 hover:text-slate-900">
+          <a href={`https://twitter.com/intent/tweet?text=${encodeURIComponent([article.title, article.excerpt || article.subtitle].filter(Boolean).join('\n\n'))}&url=${encodeURIComponent(shareUrl)}`} target="_blank" rel="noreferrer" className="rounded-full border border-slate-200 bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700 hover:border-slate-300 hover:text-slate-900">
             Share on X
           </a>
         </div>
@@ -2074,10 +2074,11 @@ function ShareArticle({ article }: { article: Article }) {
   const [shareState, setShareState] = useState<'idle' | 'shared' | 'copied' | 'error'>('idle');
 
   const handleShare = async () => {
-    const shareUrl = new URL(`/article/${encodeURIComponent(article.slug)}`, window.location.origin).toString();
+    const shareUrl = getArticleShareUrl(article.slug);
     try {
       if (navigator.share) {
-        await navigator.share({ title: article.title, text: article.excerpt || article.title, url: shareUrl });
+        const shareText = [article.title, article.excerpt || article.subtitle].filter(Boolean).join('\n\n');
+        await navigator.share({ title: article.title, text: shareText, url: shareUrl });
         setShareState('shared');
       } else {
         await navigator.clipboard.writeText(shareUrl);
@@ -2106,6 +2107,11 @@ function ShareArticle({ article }: { article: Article }) {
       </span>
     </button>
   );
+}
+
+function getArticleShareUrl(slug: string) {
+  const siteOrigin = import.meta.env.VITE_SITE_URL || 'https://www.primeframe.ng';
+  return new URL(`/article/${encodeURIComponent(slug)}`, siteOrigin).toString();
 }
 
 function ArticleCard({ article, compact = false }: { article: Article; compact?: boolean }) {
